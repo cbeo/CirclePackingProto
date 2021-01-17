@@ -2,6 +2,8 @@ package;
 
 import openfl.display.Sprite;
 import openfl.events.MouseEvent;
+import openfl.events.KeyboardEvent;
+import openfl.ui.Keyboard;
 import haxe.Timer;
 import haxe.ds.Option;
 
