@@ -20,8 +20,8 @@ typedef Circle = Pt & {radius:Float};
 
 class Main extends Sprite
 {
-  var sampled:Array<Pt>;
 
+  var path:Array<Pt>;
   var drawing = false;
   var timestamp:Float;
 
@@ -38,17 +38,155 @@ class Main extends Sprite
   {
   }
 
-  function circlesIntersect(c1:Circle,c2:Circle):Bool
+  
+  function findSelfIntersectionIndex (p:Pt ) : Option<Int>
+  {
+    if ( path.length > 0) {
+      var last = path.length - 1;
+
+      for (i in 1 ... last) 
+        if (linesIntersect( path[i-1], path[i], path[last], p)) 
+          return Some(i);
+    }
+    return None;      
+  }
+
+  function findSelfIntersectionPt (p:Pt ) : Option<Pt>
+  {
+    if ( path.length > 0) {
+      var last = path.length - 1;
+
+      for (i in 1 ... last) 
+        if (linesIntersect( path[i-1], path[i], path[last], p)) 
+          return linesIntersectAt( path[i-1], path[i], path[last], p );
+    }
+    return None;      
+  }
+  
+  function selfIntersectionCheck( p:Pt ) : Bool
+  {
+    return switch (findSelfIntersectionIndex( p ))
+      {
+      case  Some(_): true;
+      case None: false;
+      };
+  }
+  
+  function onMouseDown (e) {
+    drawing = true;
+    timestamp = Timer.stamp();
+    path = [ {x:e.localX, y:e.localY} ];
+    graphics.clear();
+    graphics.lineStyle(3,0);
+    graphics.moveTo( e.localX, e.localY );
+  }
+
+  function onMouseUp (e) {
+    drawing = false;
+  }
+
+  function drawPath()
+  {
+    graphics.clear();
+
+    graphics.moveTo( path[0].x,  path[0].y );
+
+    for (i in 1...path.length) {
+      graphics.lineStyle(3, 0);
+      graphics.lineTo( path[i].x, path[i].y );
+      graphics.lineStyle(2, 0xff0000);
+      graphics.drawCircle(path[i].x,path[i].y, 5.0);
+    }
+
+
+    graphics.lineStyle(3, 0);
+    graphics.lineTo(path[0].x, path[0].y);
+    graphics.lineStyle(2, 0xff0000);
+    graphics.drawCircle(path[0].x,path[0].y, 5.0);
+
+
+  }
+
+  function pathEdgeDistances()
+  {
+    if (path.length > 1) {
+
+      var max = ptDist(path[0],path[1]);
+      var min = max;
+      
+      for (i in 0...path.length-2)
+        {
+          var dist = ptDist( path[i], path[i+1]);
+          max = Math.max(max, dist);
+          min = Math.min(min,dist);
+        }
+      return {max:max,min:min};
+    }
+    return null;
+  }
+
+  function onKeyDown (e)
+  {
+    if (e.charCode == Keyboard.SPACE)
+      addCircle();
+  }
+  
+  function onMouseMove (e)
+  {
+    var stamp = Timer.stamp();
+    var pt = {x:e.localX, y:e.localY};
+
+    if (drawing && (stamp - timestamp > 0.01)) {
+      switch (findSelfIntersectionIndex( pt ))
+        {
+        case Some(i):
+          var firstAndLastOption = findSelfIntersectionPt( pt );
+          drawing = false;
+          path = path.slice(i);
+
+          trace(firstAndLastOption);
+          var firstAndLast = switch(firstAndLastOption)
+            {case Some(pt):pt; default:path[0];};
+
+          trace(firstAndLast);
+          
+          path[0] = firstAndLast;
+
+          drawPath();
+          
+          trace("path edge differences: ");
+          trace(pathEdgeDistances());
+
+          return; // exiting early.. a little ugly.
+          
+        case None: {}
+        }      
+
+      timestamp = stamp;
+      path.push( pt );
+      graphics.lineTo( e.localX, e.localY );
+    }
+    
+  }
+
+  static function ptDist(p1:Pt,p2:Pt)
+  {
+    var dx = p2.x - p1.x;
+    var dy = p2.y - p1.y;
+    return Math.sqrt( dx*dx + dy*dy);
+  }
+
+  static function circlesIntersect(c1:Circle,c2:Circle):Bool
   {
     return ptDist(c1, c2) <= c1.radius + c2.radius;
   }
 
-  function circleContains(c1:Circle,c2:Circle):Bool
+  static function circleContains(c1:Circle,c2:Circle):Bool
   {
     return c2.radius <= c1.radius && ptDist(c1,c2) <= c1.radius;
   }
 
-  function lineOfSegment (a:Pt,b:Pt):Line
+  static function lineOfSegment (a:Pt,b:Pt):Line
   {
     if (a.x == b.x)
       return Vertical(a.y);
@@ -61,16 +199,16 @@ class Main extends Sprite
     return Sloped(slope,yIntercept);
   }
 
-  function isCounterClockwiseOrder(a:Pt,b:Pt,c:Pt) {
+  static function isCounterClockwiseOrder(a:Pt,b:Pt,c:Pt) {
     return (b.x - a.x) * (c.y - a.y) > (b.y - a.y) * (c.x - a.x);
   }
 
-  function linesIntersect (a:Pt,b:Pt,c:Pt,d:Pt) : Bool {
+  static function linesIntersect (a:Pt,b:Pt,c:Pt,d:Pt) : Bool {
     return (isCounterClockwiseOrder( a, c, d) != isCounterClockwiseOrder(b, c, d)) &&
       (isCounterClockwiseOrder( a ,b, c) != isCounterClockwiseOrder(a, b, d));
   }
 
-  function linesIntersectAt (a:Pt,b:Pt,c:Pt,d:Pt) : Option<Pt>
+  static function linesIntersectAt (a:Pt,b:Pt,c:Pt,d:Pt) : Option<Pt>
   {
     var line1 = lineOfSegment(a,b);
     var line2 = lineOfSegment(c,d);
@@ -98,142 +236,7 @@ class Main extends Sprite
         return None;
       }
   }
-  
-  function findSelfIntersectionIndex (p:Pt ) : Option<Int>
-  {
-    if ( sampled.length > 0) {
-      var last = sampled.length - 1;
-
-      for (i in 1 ... last) 
-        if (linesIntersect( sampled[i-1], sampled[i], sampled[last], p)) 
-          return Some(i);
-    }
-    return None;      
-  }
-
-  function findSelfIntersectionPt (p:Pt ) : Option<Pt>
-  {
-    if ( sampled.length > 0) {
-      var last = sampled.length - 1;
-
-      for (i in 1 ... last) 
-        if (linesIntersect( sampled[i-1], sampled[i], sampled[last], p)) 
-          return linesIntersectAt( sampled[i-1], sampled[i], sampled[last], p );
-    }
-    return None;      
-  }
-  
-  function selfIntersectionCheck( p:Pt ) : Bool
-  {
-    return switch (findSelfIntersectionIndex( p ))
-      {
-      case  Some(_): true;
-      case None: false;
-      };
-  }
-  
-  function onMouseDown (e) {
-    drawing = true;
-    timestamp = Timer.stamp();
-    sampled = [ {x:e.localX, y:e.localY} ];
-    graphics.clear();
-    graphics.lineStyle(3,0);
-    graphics.moveTo( e.localX, e.localY );
-  }
-
-  function onMouseUp (e) {
-    drawing = false;
-  }
-
-  function drawSampled()
-  {
-    graphics.clear();
-
-    graphics.moveTo( sampled[0].x,  sampled[0].y );
-
-    for (i in 1...sampled.length) {
-      graphics.lineStyle(3, 0);
-      graphics.lineTo( sampled[i].x, sampled[i].y );
-      graphics.lineStyle(2, 0xff0000);
-      graphics.drawCircle(sampled[i].x,sampled[i].y, 5.0);
-    }
 
 
-    graphics.lineStyle(3, 0);
-    graphics.lineTo(sampled[0].x, sampled[0].y);
-    graphics.lineStyle(2, 0xff0000);
-    graphics.drawCircle(sampled[0].x,sampled[0].y, 5.0);
-
-
-  }
-
-  function pathEdgeDistances()
-  {
-    if (sampled.length > 1) {
-
-      var max = ptDist(sampled[0],sampled[1]);
-      var min = max;
-      
-      for (i in 0...sampled.length-2)
-        {
-          var dist = ptDist( sampled[i], sampled[i+1]);
-          max = Math.max(max, dist);
-          min = Math.min(min,dist);
-        }
-      return {max:max,min:min};
-    }
-    return null;
-  }
-
-  function onKeyDown (e)
-  {
-    if (e.charCode == Keyboard.SPACE)
-      addCircle();
-  }
-  
-  function onMouseMove (e)
-  {
-    var stamp = Timer.stamp();
-    var pt = {x:e.localX, y:e.localY};
-
-    if (drawing && (stamp - timestamp > 0.01)) {
-      switch (findSelfIntersectionIndex( pt ))
-        {
-        case Some(i):
-          var firstAndLastOption = findSelfIntersectionPt( pt );
-          drawing = false;
-          sampled = sampled.slice(i);
-
-          trace(firstAndLastOption);
-          var firstAndLast = switch(firstAndLastOption)
-            {case Some(pt):pt; default:sampled[0];};
-
-          trace(firstAndLast);
-          
-          sampled[0] = firstAndLast;
-
-          drawSampled();
-          
-          trace("path edge differences: ");
-          trace(pathEdgeDistances());
-
-          return; // exiting early.. a little ugly.
-          
-        case None: {}
-        }      
-
-      timestamp = stamp;
-      sampled.push( pt );
-      graphics.lineTo( e.localX, e.localY );
-    }
-    
-  }
-
-  static function ptDist(p1:Pt,p2:Pt)
-  {
-    var dx = p2.x - p1.x;
-    var dy = p2.y - p1.y;
-    return Math.sqrt( dx*dx + dy*dy);
-  }
 
 }
