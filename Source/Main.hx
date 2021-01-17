@@ -31,6 +31,11 @@ class Main extends Sprite
     stage.addEventListener( MouseEvent.MOUSE_DOWN, onMouseDown);
     stage.addEventListener( MouseEvent.MOUSE_UP, onMouseUp);
     stage.addEventListener( MouseEvent.MOUSE_MOVE, onMouseMove);
+    stage.addEventListener( KeyboardEvent.KEY_DOWN, onKeyDown);
+  }
+
+  function addCircle()
+  {
   }
 
   function circlesIntersect(c1:Circle,c2:Circle):Bool
@@ -180,7 +185,14 @@ class Main extends Sprite
     return null;
   }
 
-  function onMouseMove (e) {
+  function onKeyDown (e)
+  {
+    if (e.charCode == Keyboard.SPACE)
+      addCircle();
+  }
+  
+  function onMouseMove (e)
+  {
     var stamp = Timer.stamp();
     var pt = {x:e.localX, y:e.localY};
 
