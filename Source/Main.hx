@@ -7,14 +7,14 @@ import haxe.ds.Option;
 
 typedef Pt= {x:Float, y:Float};
 
+
 enum Line {
   Vertical(xVal:Float);
   Horizontal(yVal:Float);
   Sloped(slop:Float,yIntercept:Float);
 }
 
-
-
+typedef Circle = Pt & {radius:Float};
 
 class Main extends Sprite
 {
@@ -26,11 +26,19 @@ class Main extends Sprite
   public function new()
   {
     super();
-
     stage.addEventListener( MouseEvent.MOUSE_DOWN, onMouseDown);
     stage.addEventListener( MouseEvent.MOUSE_UP, onMouseUp);
     stage.addEventListener( MouseEvent.MOUSE_MOVE, onMouseMove);
+  }
 
+  function circlesIntersect(c1:Circle,c2:Circle):Bool
+  {
+    return ptDist(c1, c2) <= c1.radius + c2.radius;
+  }
+
+  function circleContains(c1:Circle,c2:Circle):Bool
+  {
+    return c2.radius <= c1.radius && ptDist(c1,c2) <= c1.radius;
   }
 
   function lineOfSegment (a:Pt,b:Pt):Line
@@ -133,13 +141,23 @@ class Main extends Sprite
   function drawSampled()
   {
     graphics.clear();
-    graphics.lineStyle(3, 0);
+
     graphics.moveTo( sampled[0].x,  sampled[0].y );
 
-    for (i in 1...sampled.length)
+    for (i in 1...sampled.length) {
+      graphics.lineStyle(3, 0);
       graphics.lineTo( sampled[i].x, sampled[i].y );
+      graphics.lineStyle(2, 0xff0000);
+      graphics.drawCircle(sampled[i].x,sampled[i].y, 5.0);
+    }
 
+
+    graphics.lineStyle(3, 0);
     graphics.lineTo(sampled[0].x, sampled[0].y);
+    graphics.lineStyle(2, 0xff0000);
+    graphics.drawCircle(sampled[0].x,sampled[0].y, 5.0);
+
+
   }
 
   function pathEdgeDistances()
