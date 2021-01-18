@@ -12,7 +12,9 @@ Just a prototype to prove a concept.
 
     # or 
     openfl build html5
-    
+
+
+(gif recorder set to an unbearably slow framerate it seems.)
 
 <img 
 src="https://raw.githubusercontent.com/cbeo/CirclePackingProto/master/circle-packing.gif" 
