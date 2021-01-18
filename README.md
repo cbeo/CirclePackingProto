@@ -16,5 +16,5 @@ Just a prototype to prove a concept.
 
 <img 
 src="https://raw.githubusercontent.com/cbeo/CirclePackingProto/master/circle-packing.gif" 
-width="250px"/>
+width="450px"/>
 
