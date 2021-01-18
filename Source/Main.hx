@@ -9,6 +9,7 @@ import haxe.ds.Option;
 
 typedef Pt= {x:Float, y:Float};
 
+typedef Rect = Pt & {width:Float, height:Float};
 
 enum Line {
   Vertical(xVal:Float);
@@ -25,20 +26,138 @@ class Main extends Sprite
   var drawing = false;
   var timestamp:Float;
 
+  var radiusGradient = 10.0;
+  var circles:Array<Circle> = [];
+  
   public function new()
   {
     super();
     stage.addEventListener( MouseEvent.MOUSE_DOWN, onMouseDown);
     stage.addEventListener( MouseEvent.MOUSE_UP, onMouseUp);
     stage.addEventListener( MouseEvent.MOUSE_MOVE, onMouseMove);
-    stage.addEventListener( KeyboardEvent.KEY_DOWN, onKeyDown);
   }
 
-  function addCircle()
+  function addCircles()
   {
+    circles = [];
+    if (path.length > 2 && !drawing)
+      {
+        var bbox = pathBoundingBox();
+        var maxDim = Math.max(bbox.width, bbox.height);
+        var rad = radiusGradient * Math.floor(maxDim / radiusGradient);
+        while (rad > 0) {
+          for (i in 0...100) {
+            var circ = randomCircle(bbox, rad);
+            if ( validCircle(circ)) circles.push(circ);
+          }
+          rad -= radiusGradient;
+        }
+      }
   }
 
+
+  function validCircle(circ:Circle):Bool
+  {
+    return circleInsideClosedPath(circ) && !circleIntersectsCircles(circ);
+  }
   
+  function circleInsideClosedPath (c:Circle):Bool
+  {
+    return pointInsideClosedPath(c) && !circleIntersectsPath( c );
+  }
+  
+  function pointInsideClosedPath(pt:Pt):Bool
+  {
+    var intersections = 0;
+    var leftPt : Pt = { x: 0, y: pt.y};
+
+    for (i in 0...path.length-1)
+      if (linesIntersect( leftPt, pt, path[i], path[i + 1] ))
+        intersections += 1;
+
+    if (linesIntersect( leftPt, pt, path[path.length - 1], path[0]))
+      intersections += 1;
+
+    return intersections % 2 == 1;
+  }
+
+  function circleIntersectsCircles( circ:Circle):Bool
+  {
+    for (c in circles) if (circlesIntersect(c, circ)) return true;
+    return false;
+  }
+  
+  function circleIntersectsLine(circ:Circle,line:Line):Bool
+  {
+    switch (line)
+      {
+      case Vertical(xVal):
+        return Math.abs(circ.x - xVal) <= circ.radius;
+
+      case Horizontal(yVal):
+        return Math.abs(circ.y - yVal) <= circ.radius;
+
+      case Sloped(m, yInt):
+        var a = (m*m + 1);
+        var k = yInt - circ.y;
+        var b = 2 * (m*k - circ.x);
+        var c = (k * k + circ.x * circ.x - circ.radius * circ.radius);
+
+        var discriminant = b * b - 4 * a * c;
+        return discriminant >= 0;
+      }
+  }
+
+  function isBetween(a:Float, b:Float, c:Float):Bool
+  {
+    if (a < c)
+      return a <= b && b <= c;
+
+    return c <= b && b <= a;
+  }
+
+  function circleIntersectsPath( circ:Circle ):Bool
+  {
+
+    for (i in 0...path.length - 1)
+      {
+        if (circleContainsPt( circ, path[i] ))
+          return true;
+        
+        if (circleContainsPt( circ, path[i+1]))
+          return true;
+        
+        if ( circleIntersectsLine( circ, lineOfSegment( path[i], path[i + 1])) &&
+             (isBetween( path[i].x, circ.x, path[i+1].x) ||
+              isBetween( path[i].y, circ.y, path[i+1].y)))
+          return true;
+      }
+    
+    return false;
+  }
+
+  static function circleContainsPt( circle:Circle, pt:Pt):Bool
+  {
+    return circle.radius >= ptDist(circle, pt);
+  }
+
+  static function randomCircle(bbox:Rect, rad:Float):Circle
+  {
+    var cx = (Math.random() * bbox.width) + bbox.x;
+    var cy = (Math.random() * bbox.height) + bbox.y;
+    return {radius:rad, x: cx, y:cy};
+  }
+  
+  static function circlesIntersect(c1:Circle,c2:Circle):Bool
+  {
+    return ptDist(c1, c2) <= c1.radius + c2.radius;
+  }
+
+  static function circleContains(c1:Circle,c2:Circle):Bool
+  {
+    return c2.radius <= c1.radius && ptDist(c1,c2) <= c1.radius;
+  }
+
   function findSelfIntersectionIndex (p:Pt ) : Option<Int>
   {
     if ( path.length > 0) {
@@ -72,17 +191,31 @@ class Main extends Sprite
       };
   }
   
-  function onMouseDown (e) {
+  function onMouseDown (e)
+  {
     drawing = true;
     timestamp = Timer.stamp();
     path = [ {x:e.localX, y:e.localY} ];
+
     graphics.clear();
     graphics.lineStyle(3,0);
     graphics.moveTo( e.localX, e.localY );
   }
 
-  function onMouseUp (e) {
+  function onMouseUp (e)
+  {
     drawing = false;
+  }
+
+  function drawCircle(c:Circle)
+  {
+    graphics.drawCircle( c.x, c.y, c.radius );
+  }
+
+  function drawCircles()
+  {
+    graphics.lineStyle(1,0xff0000);
+    for (c in circles) drawCircle(c);
   }
 
   function drawPath()
@@ -94,17 +227,37 @@ class Main extends Sprite
     for (i in 1...path.length) {
       graphics.lineStyle(3, 0);
       graphics.lineTo( path[i].x, path[i].y );
-      graphics.lineStyle(2, 0xff0000);
-      graphics.drawCircle(path[i].x,path[i].y, 5.0);
     }
 
 
     graphics.lineStyle(3, 0);
     graphics.lineTo(path[0].x, path[0].y);
-    graphics.lineStyle(2, 0xff0000);
-    graphics.drawCircle(path[0].x,path[0].y, 5.0);
 
+    var bbox = pathBoundingBox();
+    graphics.lineStyle(1,0x00ff00);
+    graphics.drawRect(bbox.x,bbox.y,bbox.width,bbox.height);
+    
+  }
 
+  function pathBoundingBox () : Rect
+  {
+    if (path.length == 0)
+      return {x:0,y:0,width:0,height:0};
+
+    var leftMost = path[0].x;
+    var rightMost = leftMost;
+    var topMost = path[0].y;
+    var bottomMost = topMost;
+
+    for (pt in path)
+      {
+        leftMost = Math.min( leftMost, pt.x);
+        rightMost = Math.max( rightMost, pt.x);
+        topMost = Math.min( topMost, pt.y);
+        bottomMost = Math.max( bottomMost, pt.y);
+      }
+
+    return {x:leftMost, y: topMost, width: rightMost - leftMost, height: bottomMost - topMost};
   }
 
   function pathEdgeDistances()
@@ -125,12 +278,6 @@ class Main extends Sprite
     return null;
   }
 
-  function onKeyDown (e)
-  {
-    if (e.charCode == Keyboard.SPACE)
-      addCircle();
-  }
-  
   function onMouseMove (e)
   {
     var stamp = Timer.stamp();
@@ -152,7 +299,9 @@ class Main extends Sprite
           
           path[0] = firstAndLast;
 
+          addCircles();
           drawPath();
+          drawCircles();
           
           trace("path edge differences: ");
           trace(pathEdgeDistances());
@@ -176,15 +325,6 @@ class Main extends Sprite
     return Math.sqrt( dx*dx + dy*dy);
   }
 
-  static function circlesIntersect(c1:Circle,c2:Circle):Bool
-  {
-    return ptDist(c1, c2) <= c1.radius + c2.radius;
-  }
-
-  static function circleContains(c1:Circle,c2:Circle):Bool
-  {
-    return c2.radius <= c1.radius && ptDist(c1,c2) <= c1.radius;
-  }
 
   static function lineOfSegment (a:Pt,b:Pt):Line
   {
@@ -236,7 +376,5 @@ class Main extends Sprite
         return None;
       }
   }
-
-
 
 }
