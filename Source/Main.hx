@@ -46,7 +46,7 @@ class Main extends Sprite
         var maxDim = Math.max(bbox.width, bbox.height);
         var rad = radiusGradient * Math.floor(maxDim / radiusGradient);
         while (rad > 0) {
-          for (i in 0...100) {
+          for (i in 0...500) {
             var circ = randomCircle(bbox, rad);
             if ( validCircle(circ)) circles.push(circ);
           }
